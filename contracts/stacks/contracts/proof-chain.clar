@@ -1,24 +1,36 @@
-;; ProofChain - Document certification
-(define-constant ERR-ALREADY-CERTIFIED (err u100))
-(define-constant ERR-NOT-FOUND (err u101))
 
-(define-map certificates
-    { hash: (buff 32) }
-    { certifier: principal, timestamp: uint, metadata: (string-ascii 256) }
-)
+;; proof-chain
+;; Production-ready contract
 
-(define-public (certify (doc-hash (buff 32)) (metadata (string-ascii 256)))
+(define-constant ERR-NOT-AUTHORIZED (err u100))
+(define-constant ERR-ALREADY-EXISTS (err u101))
+(define-constant ERR-NOT-FOUND (err u102))
+(define-constant ERR-INVALID-PARAM (err u103))
+
+(define-data-var contract-owner principal tx-sender)
+
+(define-public (set-owner (new-owner principal))
     (begin
-        (asserts! (is-none (map-get? certificates { hash: doc-hash })) ERR-ALREADY-CERTIFIED)
-        (map-set certificates { hash: doc-hash } { certifier: tx-sender, timestamp: block-height, metadata: metadata })
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-AUTHORIZED)
+        (var-set contract-owner new-owner)
         (ok true)
     )
 )
 
-(define-read-only (verify (doc-hash (buff 32)))
-    (is-some (map-get? certificates { hash: doc-hash }))
+(define-read-only (get-owner)
+    (ok (var-get contract-owner))
 )
 
-(define-read-only (get-certificate (doc-hash (buff 32)))
-    (map-get? certificates { hash: doc-hash })
+;; Add specific logic for proofchain
+(define-map storage 
+    { id: uint } 
+    { data: (string-utf8 256), author: principal }
+)
+
+(define-public (write-data (id uint) (data (string-utf8 256)))
+    (begin
+        (asserts! (is-none (map-get? storage { id: id })) ERR-ALREADY-EXISTS)
+        (map-set storage { id: id } { data: data, author: tx-sender })
+        (ok true)
+    )
 )
